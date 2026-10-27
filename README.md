@@ -1,65 +1,73 @@
-# Examen Módulo 2: Integración de Servicios AWS Lambda y EC2
+# Examen Práctico Módulo 2: Integración de Servicios AWS Lambda y EC2
 
-Este repositorio contiene la documentación, código y evidencias del taller práctico sobre la integración de servicios **AWS Lambda**, **Amazon EC2**, **IAM** y **Amazon CloudWatch** para la consulta automatizada de metadatos de infraestructura.
+**Consulta de Metadatos de Infraestructura y Observabilidad**
 
----
-
-## 📄 Información del Proyecto
-
-* **Autor:** Luis Carlos Rodríguez Timote
-* **Fecha:** Octubre 2026
-* **Institución:** Entrenamiento AWS
-* **Servicio Principal:** AWS Lambda & Amazon EC2
+* **Autor:** Luis Carlos Rodríguez Timote  
+* **Institución:** Bootcamp Betek  
+* **Fecha:** 27 de octubre de 2026  
 
 ---
 
-## 🎯 Objetivo General
+## 📋 Descripción del Proyecto
 
-Implementar una función Lambda en **Python** que consulte mediante el SDK `boto3` el listado de instancias EC2 en la cuenta, extrayendo su ID, estado y tipo, aplicando el principio de mínimo privilegio en IAM y asegurando la observabilidad a través de CloudWatch Logs.
-
----
-
-## ⚙️ Arquitectura y Componentes
-
-1. **IAM Role (`luiscarlos-lambda-ec2-role`):**
-   * Políticas asociadas: Permisos de lectura sobre EC2 (`AmazonEC2ReadOnlyAccess`) y permisos para escritura de registros en CloudWatch (`AWSLambdaBasicExecutionRole`).
-2. **AWS Lambda (`fn-lambda-luiscarlos-consultar-ec2`):**
-   * Runtime: Python 3.x
-   * Handler: `lambda_function.lambda_handler`
-   * Timeout configurado: 10 segundos
-3. **Amazon CloudWatch:**
-   * Log Group: `/aws/lambda/fn-lambda-luiscarlos-consultar-ec2`
+Este proyecto demuestra la integración exitosa entre un modelo de computación serverless (**AWS Lambda**) y la gestión/monitoreo de infraestructura en la nube (**Amazon EC2**). A través de automatización con **Python (`boto3`)**, auditoría con **AWS CloudTrail** y monitoreo/observabilidad con **Amazon CloudWatch**, se implementa una solución completa para inspección de métricas y consulta de metadatos en tiempo real.
 
 ---
 
-## 🛠️ Descripción del Proceso Realizado (Paso a Paso)
+## 🛠️ Arquitectura y Componentes Desplegados
 
-1. **Creación del Rol IAM y Permisos:**
-   Se creó y configuró el rol de ejecución `luiscarlos-lambda-ec2-role`, asignándole los permisos necesarios de lectura para EC2 y los privilegios básicos para la gestión de registros.
-
-2. **Creación de la Función Lambda:**
-   Se creó la función Lambda denominada `fn-lambda-luiscarlos-consultar-ec2`, integrando el código en Python con la librería `boto3` para consultar el ID, el estado y el tipo de las instancias EC2.
-
-3. **Actualización de la Función y Configuración del Timeout:**
-   Se actualizó la configuración general de la función Lambda, ampliando el parámetro **Timeout** de 3 a 10 segundos para solucionar y prevenir errores de tiempo de ejecución (`Sandbox.Timedout`).
-
-4. **Ejecución de Pruebas (Test):**
-   Se creó y guardó el evento de prueba `test-ec2-luiscarlos`, ejecutando la función de forma exitosa (código de respuesta `200`).
-
-5. **Verificación en Amazon CloudWatch (Logs):**
-   Finalmente, se accedió al servicio CloudWatch, ingresando a la sección **Log management** -> **Log groups** para ubicar el grupo de registros de la función y verificar que los datos de las instancias fueron registrados correctamente.
+### Parte 1: Configuración de Escalabilidad (Auto Scaling)
+* **Launch Template:** `luiscarlos-ec2-modulo2-examen2-template` (`lt-0b074d9cb52d7fc40`)
+  * **AMI:** Amazon Linux 2023 (`ami-04b938437b69a2c9c`)
+  * **Tipo de Instancia:** `t2.micro`
+* **Auto Scaling Group (ASG):** `luiscarlos-asg-modulo2`
+  * **VPC:** `Modulo2-vpc`
+  * **Subredes:** `public1-us-east-1a` y `public2-us-east-1b` (Alta disponibilidad)
+  * **Capacidad:** `Desired = 1`, `Min = 1`, `Max = 2`
 
 ---
 
-## 💻 Código de la Función Lambda (`lambda_function.py`)
+### Parte 2: Observabilidad y Monitoreo (Amazon CloudWatch)
+Se configuraron métricas y alarmas específicas para la instancia EC2 desplegada por el ASG:
+* **Alarmas de CPU:**
+  * `luiscarlos-cpu-60-warning`: Alerta de advertencia cuando el uso de CPU supera el **60%**.
+  * `luiscarlos-cpu-90-critical`: Alerta crítica cuando el uso de CPU supera el **90%**.
+* **Métricas Monitoreadas:**
+  * `CPUUtilization`
+  * `NetworkIn`
+  * `NetworkOut`
+
+---
+
+### Parte 3: Auditoría y Trazabilidad (AWS CloudTrail)
+1. **Origen de la Instancia:** Se confirmó a través del registro de eventos JSON que la instancia fue creada automáticamente por el servicio de Auto Scaling (`autoscaling.amazonaws.com`) utilizando el rol asignado (`AWSServiceRoleForAutoScaling`).
+2. **Registro de Acciones de Usuario IAM:**
+   * `RunInstances`
+   * `LookupEvents`
+   * `ListManagedNotificationEvents`
+   * `DescribeAlarms`
+   * `ListManagedNotificationEvents`
+
+---
+
+### Parte 4: Servidor e Inspección de Infraestructura (AWS Lambda)
+
+#### 1. Permisos IAM
+* **Rol:** `luiscarlos-lambda-ec2-role`
+* Permisos concedidos para lectura de instancias EC2 (`ec2:DescribeInstances`) y escritura de registros en CloudWatch Logs.
+
+#### 2. Función Lambda
+* **Nombre:** `fn-lambda-luiscarlos-consultar-ec2`
+* **Runtime:** Python 3.x
+* **Timeout Ajustado:** 10 segundos (para prevenir timeout por defecto de 3s).
 
 ```python
 import json
 import boto3
 
-ec2 = boto3.client('ec2')
-
 def lambda_handler(event, context):
+    ec2 = boto3.client('ec2')
+    
     # Consultar las instancias EC2
     response = ec2.describe_instances()
     
@@ -79,8 +87,13 @@ def lambda_handler(event, context):
     }
 ```
 
+#### 3. Ejecución y Registros (CloudWatch Logs)
+* **Evento de Prueba:** `test-ec2-luiscarlos`
+* **Grupo de Logs:** `/aws/lambda/fn-lambda-luiscarlos-consultar-ec2`
+* **Resultado:** Ejecución exitosa (`statusCode: 200`) imprimiendo en los streams de CloudWatch el ID, estado (`running`/`stopped`) y tipo (`t2.micro`) de todas las instancias en la cuenta.
+
 ---
 
-## 💡 Conclusión
+## 🎯 Conclusión
 
-El desarrollo de esta práctica permitió validar con éxito la integración de un modelo de computación *serverless* utilizando **AWS Lambda** para la gestión e inspección automatizada de infraestructura en la nube (**Amazon EC2**). Se reforzaron conceptos fundamentales de seguridad mediante **IAM**, ajuste de parámetros de rendimiento (Timeout) y monitoreo con **Amazon CloudWatch Logs**.
+El desarrollo de este examen práctico validó con éxito la integración entre servicios Serverless (**AWS Lambda**) y de infraestructura (**Amazon EC2**), permitiendo una inspección automatizada y un esquema eficiente de observabilidad y trazabilidad en la nube de AWS.
